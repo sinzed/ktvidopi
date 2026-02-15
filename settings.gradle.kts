@@ -1,1 +1,1 @@
-rootProject.name = "ktvidopi"
+rootProject.name = "processor"

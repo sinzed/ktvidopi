@@ -1,66 +1,59 @@
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-
 plugins {
-    kotlin("jvm") version "1.9.22"
-    kotlin("plugin.serialization") version "1.9.22"
-    application
+	kotlin("jvm") version "2.2.21"
+	kotlin("plugin.spring") version "2.2.21"
+	war
+	id("org.springframework.boot") version "4.0.2"
+	id("io.spring.dependency-management") version "1.1.7"
 }
 
-group = "com.ktvidopi"
-version = "1.0.0"
+group = "com.vidopi"
+version = "0.0.1-SNAPSHOT"
+description = "Vidopi Job Processor"
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+configurations {
+	compileOnly {
+		extendsFrom(configurations.annotationProcessor.get())
+	}
+}
 
 repositories {
-    mavenCentral()
+	mavenCentral()
 }
 
 dependencies {
-    // Ktor Server
-    implementation("io.ktor:ktor-server-core:2.3.7")
-    implementation("io.ktor:ktor-server-netty:2.3.7")
-    implementation("io.ktor:ktor-server-content-negotiation:2.3.7")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.7")
-    implementation("io.ktor:ktor-server-call-logging:2.3.7")
-    implementation("io.ktor:ktor-server-status-pages:2.3.7")
-    
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.7.3")
-    
-    // Database
-    implementation("org.jetbrains.exposed:exposed-core:0.45.0")
-    implementation("org.jetbrains.exposed:exposed-dao:0.45.0")
-    implementation("org.jetbrains.exposed:exposed-jdbc:0.45.0")
-    implementation("org.jetbrains.exposed:exposed-kotlin-datetime:0.45.0")
-    implementation("org.postgresql:postgresql:42.7.1")
-    implementation("com.zaxxer:HikariCP:5.1.0")
-    
-    // Logging
-    implementation("ch.qos.logback:logback-classic:1.4.14")
-    implementation("net.logstash.logback:logstash-logback-encoder:7.4")
-    
-    // Testing
-    testImplementation("io.ktor:ktor-server-test-host:2.3.7")
-    testImplementation("io.ktor:ktor-client-content-negotiation:2.3.7")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
-    testImplementation("io.mockk:mockk:1.13.9")
-    testImplementation("org.testcontainers:testcontainers:1.19.3")
-    testImplementation("org.testcontainers:postgresql:1.19.3")
-    testImplementation("org.testcontainers:junit-jupiter:1.19.3")
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
-    testImplementation("org.assertj:assertj-core:3.24.2")
+	implementation("org.slf4j:slf4j-api:2.0.9")
+	implementation("ch.qos.logback:logback-classic:1.5.25")
+	implementation("org.slf4j:slf4j-simple:2.0.9") // simple console logging
+	implementation("org.springframework.boot:spring-boot-starter-webflux")
+	implementation("org.springframework.boot:spring-boot-starter-webmvc")
+	implementation("io.projectreactor.kotlin:reactor-kotlin-extensions")
+	implementation("org.jetbrains.kotlin:kotlin-reflect")
+	implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")
+	implementation("tools.jackson.module:jackson-module-kotlin")
+	compileOnly("org.projectlombok:lombok")
+	developmentOnly("org.springframework.boot:spring-boot-devtools")
+	developmentOnly("org.springframework.boot:spring-boot-docker-compose")
+	annotationProcessor("org.projectlombok:lombok")
+	providedRuntime("org.springframework.boot:spring-boot-starter-tomcat-runtime")
+	testImplementation("org.springframework.boot:spring-boot-starter-webflux-test")
+	testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
+	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+	testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test")
+	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
-tasks.withType<KotlinCompile> {
-    kotlinOptions {
-        jvmTarget = "17"
-        freeCompilerArgs = listOf("-Xcontext-receivers")
-    }
+kotlin {
+	compilerOptions {
+		freeCompilerArgs.addAll("-Xjsr305=strict", "-Xannotation-default-target=param-property")
+	}
 }
 
-application {
-    mainClass.set("com.ktvidopi.ApplicationKt")
-}
-
-tasks.test {
-    useJUnitPlatform()
+tasks.withType<Test> {
+	useJUnitPlatform()
 }
