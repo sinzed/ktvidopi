@@ -1,5 +1,10 @@
 package com.vidopi.processor.service
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
@@ -27,21 +32,22 @@ class ThumbnailService(
 	)
 
 	/**
-	 * Generates multiple thumbnails of different sizes from a video file.
+	 * Generates multiple thumbnails of different sizes from a video file in parallel.
 	 * @param videoFile File object pointing to the video file
 	 * @return Map of size name to thumbnail File, or empty map if generation failed
 	 */
-	fun generateThumbnails(videoFile: File): Map<String, File> {
-		val thumbnails = mutableMapOf<String, File>()
-		
-		for (size in thumbnailSizes) {
-			val thumbnail = generateThumbnail(videoFile, size)
-			if (thumbnail != null) {
-				thumbnails[size.name] = thumbnail
+	suspend fun generateThumbnails(videoFile: File): Map<String, File> = coroutineScope {
+		// Generate all thumbnails in parallel
+		val deferredThumbnails = thumbnailSizes.map { size ->
+			async(Dispatchers.IO) {
+				size.name to generateThumbnail(videoFile, size)
 			}
 		}
 		
-		return thumbnails
+		// Wait for all thumbnails to complete and filter out nulls
+		deferredThumbnails.awaitAll()
+			.filter { it.second != null }
+			.associate { it.first to it.second!! }
 	}
 
 	/**
@@ -50,7 +56,7 @@ class ThumbnailService(
 	 * @param size ThumbnailSize specifying width and height
 	 * @return File object pointing to the generated thumbnail, or null if generation failed
 	 */
-	private fun generateThumbnail(videoFile: File, size: ThumbnailSize): File? {
+	private suspend fun generateThumbnail(videoFile: File, size: ThumbnailSize): File? {
 		val tempThumbnailFile = File.createTempFile("thumb_", "_${System.currentTimeMillis()}.jpg")
 		
 		return try {
@@ -73,13 +79,15 @@ class ThumbnailService(
 				tempThumbnailFile.absolutePath
 			)
 
-			logger.info("Executing FFmpeg command: ${command.joinToString(" ")}")
+			logger.info("Executing FFmpeg command for ${size.name} thumbnail: ${command.joinToString(" ")}")
 			
-			val process = ProcessBuilder(command)
-				.redirectErrorStream(true)
-				.start()
-
-			val exitCode = process.waitFor()
+			// Run FFmpeg process in IO dispatcher (blocking I/O operation)
+			val exitCode = withContext(Dispatchers.IO) {
+				val process = ProcessBuilder(command)
+					.redirectErrorStream(true)
+					.start()
+				process.waitFor()
+			}
 			
 			if (exitCode == 0 && tempThumbnailFile.exists() && tempThumbnailFile.length() > 0) {
 				logger.info("Thumbnail generated successfully: ${tempThumbnailFile.absolutePath} (${tempThumbnailFile.length()} bytes)")

@@ -40,6 +40,14 @@ class R2Service(
 		val expiresInSeconds: Long
 	)
 
+	data class MetadataResult(
+		val bucket: String,
+		val key: String,
+		val publicUrl: String?,
+		val downloadUrl: String,
+		val expiresInSeconds: Long
+	)
+
 	fun uploadVideo(inputStream: InputStream, originalFileName: String, contentType: String?, fileSize: Long? = null): UploadResult {
 		val fileExtension = originalFileName.substringAfterLast('.', "")
 		val uniqueFileName = "${UUID.randomUUID()}.$fileExtension"
@@ -141,6 +149,51 @@ class R2Service(
 		return ThumbnailResult(
 			bucket = bucketName,
 			key = thumbnailKey,
+			publicUrl = publicUrl,
+			downloadUrl = downloadUrl,
+			expiresInSeconds = ttl
+		)
+	}
+
+	fun uploadMetadata(metadataFile: java.io.File, videoKey: String): MetadataResult {
+		// Generate metadata key based on video key (e.g., video-uuid.json)
+		val baseKey = videoKey.substringBeforeLast(".")
+		val metadataKey = "$baseKey.json"
+		
+		logger.info("Uploading metadata: $metadataKey to bucket: $bucketName")
+
+		val putObjectRequest = PutObjectRequest.builder()
+			.bucket(bucketName)
+			.key(metadataKey)
+			.contentType("application/json")
+			.build()
+
+		val requestBody = RequestBody.fromFile(metadataFile)
+		
+		s3Client.putObject(putObjectRequest, requestBody)
+		
+		val publicUrl = publicUrlBase
+			.takeIf { it.isNotBlank() }
+			?.trimEnd('/')
+			?.let { "$it/$metadataKey" }
+
+		val getObjectRequest = GetObjectRequest.builder()
+			.bucket(bucketName)
+			.key(metadataKey)
+			.build()
+
+		val ttl = presignedUrlTtlSeconds.coerceAtLeast(60)
+		val presignRequest = GetObjectPresignRequest.builder()
+			.signatureDuration(Duration.ofSeconds(ttl))
+			.getObjectRequest(getObjectRequest)
+			.build()
+
+		val downloadUrl = s3Presigner.presignGetObject(presignRequest).url().toExternalForm()
+
+		logger.info("Metadata uploaded successfully. key=$metadataKey publicUrl=$publicUrl presignedTtlSeconds=$ttl")
+		return MetadataResult(
+			bucket = bucketName,
+			key = metadataKey,
 			publicUrl = publicUrl,
 			downloadUrl = downloadUrl,
 			expiresInSeconds = ttl
