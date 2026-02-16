@@ -32,6 +32,14 @@ class R2Service(
 		val expiresInSeconds: Long
 	)
 
+	data class ThumbnailResult(
+		val bucket: String,
+		val key: String,
+		val publicUrl: String?,
+		val downloadUrl: String,
+		val expiresInSeconds: Long
+	)
+
 	fun uploadVideo(inputStream: InputStream, originalFileName: String, contentType: String?, fileSize: Long? = null): UploadResult {
 		val fileExtension = originalFileName.substringAfterLast('.', "")
 		val uniqueFileName = "${UUID.randomUUID()}.$fileExtension"
@@ -88,6 +96,51 @@ class R2Service(
 		return UploadResult(
 			bucket = bucketName,
 			key = objectKey,
+			publicUrl = publicUrl,
+			downloadUrl = downloadUrl,
+			expiresInSeconds = ttl
+		)
+	}
+
+	fun uploadThumbnail(thumbnailFile: java.io.File, videoKey: String, sizeName: String): ThumbnailResult {
+		// Generate thumbnail key based on video key with size suffix (e.g., video-uuid-small.jpg)
+		val baseKey = videoKey.substringBeforeLast(".")
+		val thumbnailKey = "$baseKey-$sizeName.jpg"
+		
+		logger.info("Uploading thumbnail ($sizeName): $thumbnailKey to bucket: $bucketName")
+
+		val putObjectRequest = PutObjectRequest.builder()
+			.bucket(bucketName)
+			.key(thumbnailKey)
+			.contentType("image/jpeg")
+			.build()
+
+		val requestBody = RequestBody.fromFile(thumbnailFile)
+		
+		s3Client.putObject(putObjectRequest, requestBody)
+		
+		val publicUrl = publicUrlBase
+			.takeIf { it.isNotBlank() }
+			?.trimEnd('/')
+			?.let { "$it/$thumbnailKey" }
+
+		val getObjectRequest = GetObjectRequest.builder()
+			.bucket(bucketName)
+			.key(thumbnailKey)
+			.build()
+
+		val ttl = presignedUrlTtlSeconds.coerceAtLeast(60)
+		val presignRequest = GetObjectPresignRequest.builder()
+			.signatureDuration(Duration.ofSeconds(ttl))
+			.getObjectRequest(getObjectRequest)
+			.build()
+
+		val downloadUrl = s3Presigner.presignGetObject(presignRequest).url().toExternalForm()
+
+		logger.info("Thumbnail uploaded successfully. key=$thumbnailKey publicUrl=$publicUrl presignedTtlSeconds=$ttl")
+		return ThumbnailResult(
+			bucket = bucketName,
+			key = thumbnailKey,
 			publicUrl = publicUrl,
 			downloadUrl = downloadUrl,
 			expiresInSeconds = ttl
