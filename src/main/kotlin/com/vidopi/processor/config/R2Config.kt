@@ -7,6 +7,8 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.S3Configuration
+import software.amazon.awssdk.services.s3.presigner.S3Presigner
 import java.net.URI
 
 @Configuration
@@ -34,6 +36,23 @@ class R2Config {
 			.region(Region.of("auto"))
 			.credentialsProvider(credentialsProvider)
 			.forcePathStyle(true)
+			.build()
+	}
+
+	@Bean
+	fun r2S3Presigner(): S3Presigner {
+		val credentials = AwsBasicCredentials.create(accessKeyId, secretAccessKey)
+		val credentialsProvider = StaticCredentialsProvider.create(credentials)
+
+		return S3Presigner.builder()
+			.endpointOverride(URI(endpoint))
+			.region(Region.of("auto"))
+			.credentialsProvider(credentialsProvider)
+			.serviceConfiguration(
+				S3Configuration.builder()
+					.pathStyleAccessEnabled(true)
+					.build()
+			)
 			.build()
 	}
 

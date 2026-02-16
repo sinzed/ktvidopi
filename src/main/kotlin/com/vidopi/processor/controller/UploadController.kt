@@ -15,7 +15,7 @@ class UploadController(
 ) {
 	private val logger = LoggerFactory.getLogger(UploadController::class.java)
 
-	@PostMapping(value = ["/video"], consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
+	@PostMapping(value = ["/video"], consumes = [MediaType.MULTIPART_FORM_DATA_VALUE], produces = [MediaType.APPLICATION_JSON_VALUE])
 	fun uploadVideo(@RequestParam("file") file: MultipartFile): ResponseEntity<Map<String, Any>> {
 		return try {
 			if (file.isEmpty) {
@@ -25,7 +25,7 @@ class UploadController(
 
 			logger.info("Received file upload request: ${file.originalFilename}, size: ${file.size} bytes")
 
-			val publicUrl = r2Service.uploadVideo(
+			val result = r2Service.uploadVideo(
 				inputStream = file.inputStream,
 				originalFileName = file.originalFilename ?: "unknown",
 				contentType = file.contentType,
@@ -35,7 +35,13 @@ class UploadController(
 			ResponseEntity.ok(
 				mapOf(
 					"success" to true,
-					"url" to publicUrl,
+					// Backwards-compat: `url` is now an accessible presigned download URL.
+					"url" to result.downloadUrl,
+					"downloadUrl" to result.downloadUrl,
+					"expiresInSeconds" to result.expiresInSeconds,
+					"publicUrl" to (result.publicUrl ?: ""),
+					"bucket" to result.bucket,
+					"key" to result.key,
 					"fileName" to (file.originalFilename ?: "unknown"),
 					"fileSize" to file.size,
 					"contentType" to (file.contentType ?: "unknown")
