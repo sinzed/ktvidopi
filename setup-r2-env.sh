@@ -15,6 +15,9 @@ export CLOUDFLARE_API_TOKEN="eDyGdRHciEuVrLK9UtIbXQVmK3_Ki-sHXpYimI2o"
 # R2 Bucket Name (update this with your actual bucket name)
 export CLOUDFLARE_R2_BUCKET_NAME="vidopi"
 
+# R2 Folder Prefix (folder path within the bucket, e.g., "measure" for vidopi/measure/)
+export CLOUDFLARE_R2_FOLDER_PREFIX="measure"
+
 # Optional: Public URL base if you have a custom domain configured
 # export CLOUDFLARE_R2_PUBLIC_URL_BASE="https://your-custom-domain.com"
 
@@ -23,6 +26,7 @@ echo "   - CLOUDFLARE_R2_ACCESS_KEY_ID: ${CLOUDFLARE_R2_ACCESS_KEY_ID:0:10}..."
 echo "   - CLOUDFLARE_R2_SECRET_ACCESS_KEY: ${CLOUDFLARE_R2_SECRET_ACCESS_KEY:0:10}..."
 echo "   - CLOUDFLARE_R2_ENDPOINT: $CLOUDFLARE_R2_ENDPOINT"
 echo "   - CLOUDFLARE_R2_BUCKET_NAME: $CLOUDFLARE_R2_BUCKET_NAME"
+echo "   - CLOUDFLARE_R2_FOLDER_PREFIX: $CLOUDFLARE_R2_FOLDER_PREFIX"
 echo "   - CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:0:10}..."
 echo ""
 echo "⚠️  Note: Make sure to set CLOUDFLARE_R2_BUCKET_NAME to your actual bucket name!"

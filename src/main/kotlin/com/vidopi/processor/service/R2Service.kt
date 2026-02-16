@@ -18,6 +18,7 @@ class R2Service(
 	private val s3Client: S3Client,
 	private val s3Presigner: S3Presigner,
 	@Value("\${cloudflare.r2.bucket-name:default-bucket}") private val bucketName: String,
+	@Value("\${cloudflare.r2.folder-prefix:}") private val folderPrefix: String,
 	@Value("\${cloudflare.r2.public-url-base:}") private val publicUrlBase: String,
 	@Value("\${cloudflare.r2.presigned-url-ttl-seconds:3600}") private val presignedUrlTtlSeconds: Long
 ) {
@@ -35,12 +36,22 @@ class R2Service(
 		val fileExtension = originalFileName.substringAfterLast('.', "")
 		val uniqueFileName = "${UUID.randomUUID()}.$fileExtension"
 		
-		logger.info("Uploading file: $originalFileName as $uniqueFileName to bucket: $bucketName")
-		logger.info("Using bucket name from config: $bucketName")
+		// Build the object key with folder prefix if configured
+		val objectKey = if (folderPrefix.isNotBlank()) {
+			val normalizedPrefix = folderPrefix.trim().removePrefix("/").let { 
+				if (it.endsWith("/")) it else "$it/"
+			}
+			"$normalizedPrefix$uniqueFileName"
+		} else {
+			uniqueFileName
+		}
+		
+		logger.info("Uploading file: $originalFileName as $objectKey to bucket: $bucketName")
+		logger.info("Using bucket name from config: $bucketName, folder prefix: ${folderPrefix.takeIf { it.isNotBlank() } ?: "none"}")
 
 		val putObjectRequest = PutObjectRequest.builder()
 			.bucket(bucketName)
-			.key(uniqueFileName)
+			.key(objectKey)
 			.contentType(contentType ?: "video/mp4")
 			.build()
 
@@ -56,13 +67,13 @@ class R2Service(
 		val publicUrl = publicUrlBase
 			.takeIf { it.isNotBlank() }
 			?.trimEnd('/')
-			?.let { "$it/$uniqueFileName" }
+			?.let { "$it/$objectKey" }
 
 		// NOTE: R2's `*.r2.cloudflarestorage.com` is an S3 API endpoint (not a public asset URL).
 		// Return a presigned URL so the client can download without credentials.
 		val getObjectRequest = GetObjectRequest.builder()
 			.bucket(bucketName)
-			.key(uniqueFileName)
+			.key(objectKey)
 			.build()
 
 		val ttl = presignedUrlTtlSeconds.coerceAtLeast(60)
@@ -73,10 +84,10 @@ class R2Service(
 
 		val downloadUrl = s3Presigner.presignGetObject(presignRequest).url().toExternalForm()
 
-		logger.info("File uploaded successfully. key=$uniqueFileName publicUrl=$publicUrl presignedTtlSeconds=$ttl")
+		logger.info("File uploaded successfully. key=$objectKey publicUrl=$publicUrl presignedTtlSeconds=$ttl")
 		return UploadResult(
 			bucket = bucketName,
-			key = uniqueFileName,
+			key = objectKey,
 			publicUrl = publicUrl,
 			downloadUrl = downloadUrl,
 			expiresInSeconds = ttl
